@@ -2,10 +2,20 @@ import carla
 import numpy as np
 import os
 import pygame
+import queue
 import random
 import time
 
+from PIL import Image
 from pid import PID
+
+
+def image_to_array(image):
+    array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+    array = np.reshape(array, (image.height, image.width, 4))
+    array = array[:, :, :3]
+    array = array[:, :, ::-1]
+    return array
 
 
 class World:
@@ -31,9 +41,6 @@ class World:
         self.gui = gui
         self.episode = 1
         self.sensor_list = []
-        self.image_data = []
-        self.distance_data = []
-        self.start_collection = False
 
         # This variable is True if the vehicle collides in the map
         self.collision = False
@@ -70,18 +77,19 @@ class World:
             self.clock = pygame.time.Clock()
             pygame.display.set_caption("Carla AEBS")
 
-    def update_view(self, image):
-        array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-        array = np.reshape(array, (image.height, image.width, 4))
-        array = array[:, :, :3]
-        array = array[:, :, ::-1]
-        self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-
-    def render(self):
-        if self.surface is not None:
-            self.display.blit(self.surface, (0, 0))
+    def render(self, image):
+        array = image_to_array(image)
+        surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+        if surface is not None:
+            self.display.blit(surface, (0, 0))
 
     def init(self, initial_velocity, initial_distance, precipitation=0):
+        # Create a new queue for each initialization
+        self.image_queue = queue.Queue()
+
+        # Reset collision flag which may have been enabled from the last episode
+        self.collision = False
+
         # Setup world lighting conditions (like precipitation etc.)
         # TODO: Make these params as kwargs
         weather = carla.WeatherParameters(
@@ -93,10 +101,12 @@ class World:
         self.world.set_weather(weather)
 
         # Setup vehicles and sensors
-        print('Setting up vehicles')
         self._setup_vehicles()
-        print('Setting up sensors')
         self._setup_sensors()
+
+        if self.lagging_car is None:
+            # This might happen due to failure in spawning
+            return None, None, "FAILED"
 
         # Adjust some settings based on the experimental setup in the paper
         settings = self.world.get_settings()
@@ -107,7 +117,6 @@ class World:
         # Setup PID control to track the speed of the car to the initial speed
         self.pid_controller = PID(Kp=3.0, Ki=0.001, Kd=0)
         while True:
-            self.clock.tick_busy_loop(60)
             velocity = self.lagging_car.get_velocity().y
             throttle = self.pid_controller.step(initial_velocity, velocity)
             self.lagging_car.apply_control(
@@ -117,25 +126,21 @@ class World:
                     brake=0
                 )
             )
+            self.world.tick()
+            img = self.image_queue.get()
             if self.gui:
                 self.clock.tick()
-                self.render()
+                self.render(img)
                 pygame.display.flip()
-            self.world.tick()
             if self.get_groundtruth_distance() <= initial_distance:
                 break
-        self.start_collection = True if self.collect else False
+
         self.image_data = []
         self.distance_data = []
         print(f'Reset complete for episode: {self.episode}. Reset Distance: {self.get_groundtruth_distance()}, Reset Velocity: {velocity}')
+        return self.get_groundtruth_distance(), velocity, "SUCCESS"
 
     def step(self, brake=0, throttle=0, steer=0):
-        def convert(image):
-            array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-            array = np.reshape(array, (image.height, image.width, 4))
-            array = array[:, :, :3]
-            array = array[:, :, ::-1]
-            return array
         # Resumes simulation execution after the world is set up
         # to the desired parameters
         self.lagging_car.apply_control(
@@ -145,45 +150,48 @@ class World:
                 brake=brake
             )
         )
+        self.world.tick()
+        img = self.image_queue.get()
         if self.gui:
             self.clock.tick()
-            self.render()
+            self.render(img)
             pygame.display.flip()
-        self.world.tick()
+        if self.collect:
+            self.image_data.append(img)
+            self.distance_data.append(self.get_groundtruth_distance())
 
         # Check if the episode needs to end
         has_stopped = self.lagging_car.get_velocity().y == 0
         stop_episode = has_stopped or self.collision
         if not stop_episode:
             return "RESUME"
-        
-        print(f'Episode {self.episode} ended!')
-        # Cleanup actors
-        self.destroy_actors()
-
         if self.collect:
-            print(f'Saving data to {self.collect_path}')
             # Setup the directory for storing images
             write_path = os.path.join(self.collect_path, f'episode_{self.episode}')
             if not os.path.isdir(write_path):
                 os.makedirs(write_path, exist_ok=True)
             # Save the generated data (images + gt)
-            self.image_data = [convert(i) for i in self.image_data]
-            np.save(os.path.join(write_path, 'images'), self.image_data)
+            for i in self.image_data:
+                array = image_to_array(i)
+                img = Image.fromarray(array).resize((400, 300))
+                img.save(os.path.join(write_path, f'episode_{self.episode}_{i.frame}.png'))        
             np.save(os.path.join(write_path, 'target'), self.distance_data)
-            self.episode += 1
-            return "DONE"
+
+        self.destroy_actors()
+        print(f'Episode {self.episode} ended!')
+        self.episode += 1
+        return "DONE"
 
     def _setup_vehicles(self):
         # This method creates 2 vehicle actors
         # for setting up the collision detection world
         leading_car_bp = self.bp_library.find('vehicle.audi.a2')
-        lead_transform = carla.Transform(carla.Location(x=392.1, y=320.0, z=0.0), carla.Rotation(yaw=90))
+        lead_transform = carla.Transform(carla.Location(x=393.5, y=320.0, z=0.0), carla.Rotation(yaw=90))
         self.leading_car = self.world.spawn_actor(leading_car_bp, lead_transform)
 
         lagging_car_bp = self.bp_library.find('vehicle.audi.tt')
         lag_transform = carla.Transform(carla.Location(x=391.5, y=10.0, z=0.02), carla.Rotation(yaw=89.6))
-        self.lagging_car = self.world.spawn_actor(lagging_car_bp, lag_transform)
+        self.lagging_car = self.world.try_spawn_actor(lagging_car_bp, lag_transform)
 
     def _setup_sensors(self):
         # This method attaches the camera sensor to the lagging car
@@ -211,24 +219,9 @@ class World:
         self.sensor_list.extend([camera, collision])
 
     def handle_camera(self, data):
-        # If the gui option is enabled, update the pygame display view
-        if self.gui:
-            self.update_view(data)
-        
-        if self.start_collection:
-            self.image_data.append(data)
-            self.distance_data.append(self.get_groundtruth_distance())
+        self.image_queue.put(data)
 
     def handle_collision(self, event):
-        # In case a collision is detected we set the collision to True
-        # and end the episode by destroying the actors.
-        print('Collision detected!')
-        print(event.other_actor)
-
-        # TODO: This is a hack! Since the collision sensor actually detects a collision
-        # before the camera is updated. This might mean that the simulation is running
-        # faster than what the camera callback can capture
-        time.sleep(0.1)
         self.collision = True
 
     def get_groundtruth_distance(self):
@@ -237,11 +230,12 @@ class World:
         return distance
 
     def destroy_actors(self):
-        # This method destroys all the actors and the pygame display
+        # This method destroys all the actors
         for sensor in self.sensor_list:
             sensor.destroy()
-        actor_list = self.world.get_actors()
-        self.client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
+        self.lagging_car.destroy()
+        self.leading_car.destroy()
+        self.sensor_list = []
 
 
 if __name__ == "__main__":
