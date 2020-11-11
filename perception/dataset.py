@@ -44,7 +44,6 @@ class PerceptionDataset(Dataset):
         self.target = torch.tensor(self.target).float()
 
     def __getitem__(self, idx):
-        print(self.images[idx])
         image = Image.open(self.images[idx])
         target = self.target[idx]
         if self.transform is not None:

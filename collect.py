@@ -21,6 +21,7 @@ def collect(collect_path=os.getcwd(), gui=False, num_episodes=1):
     """
     # Create the world
     world = World(gui=gui, collect=collect, collect_path=collect_path)
+    world.episode = 26
 
     for episode in range(num_episodes):
         print(f'Running episode:{episode + 1}')

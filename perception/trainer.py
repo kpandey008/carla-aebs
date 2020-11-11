@@ -16,8 +16,8 @@ _SUPPORTED_DEVICES = ['cpu', 'gpu']
 
 class Trainer:
     def __init__(self, train_dataset, val_dataset, model, lr_scheduler='poly',
-        num_epochs=100, batch_size=32, lr=0.001, train_loss='mse', eval_loss='mae',
-        log_step=10, optimizer='Adam', backend='gpu', random_state=0, **kwargs
+        num_epochs=100, batch_size=32, lr=0.01, train_loss='mse', eval_loss='mae',
+        log_step=10, optimizer='SGD', backend='gpu', random_state=0, **kwargs
     ):
         # Create the dataset
         self.lr = lr
@@ -35,7 +35,7 @@ class Trainer:
         self.model = model.to(self.device)
         self.train_criterion = get_loss(train_loss)
         self.val_criterion = get_loss(eval_loss)
-        self.optimizer = get_optimizer(optimizer, self.model, self.lr)
+        self.optimizer = get_optimizer(optimizer, self.model, self.lr, momentum=0.9, weight_decay=0.0001)
         self.lr_scheduler = get_lr_scheduler(self.optimizer, self.num_epochs, sched_type=lr_scheduler)
 
         # Some initialization code
