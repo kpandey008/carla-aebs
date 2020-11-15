@@ -1,4 +1,5 @@
 import carla
+import math
 import numpy as np
 import os
 import pygame
@@ -86,6 +87,7 @@ class World:
     def init(self, initial_velocity, initial_distance, precipitation=0):
         # Create a new queue for each initialization
         self.image_queue = queue.Queue()
+        self.collision_queue = queue.Queue()
 
         # Reset collision flag which may have been enabled from the last episode
         self.collision = False
@@ -145,7 +147,7 @@ class World:
         # to the desired parameters
         self.lagging_car.apply_control(
             carla.VehicleControl(
-                throttle=0,
+                throttle=throttle,
                 steer=steer,
                 brake=brake
             )
@@ -161,10 +163,26 @@ class World:
             self.distance_data.append(self.get_groundtruth_distance())
 
         # Check if the episode needs to end
-        has_stopped = self.lagging_car.get_velocity().y == 0
-        stop_episode = has_stopped or self.collision
+        velocity = self.lagging_car.get_velocity().y
+        gt_dist = self.get_groundtruth_distance()
+        has_stopped = velocity <= 0
+        has_collided = not self.collision_queue.empty()
+        stop_episode = has_stopped or has_collided
         if not stop_episode:
-            return "RESUME"
+            return gt_dist, velocity, 0, "RESUME"
+
+        # In case of a collision or vehicle stoppage, compute the reward
+        if has_collided:
+            collision = self.collision_queue.get().normal_impulse
+            reward = -200.0 - math.sqrt(collision.x**2 + collision.y**2 + collision.z**2) / 100.0
+            print("Collision: {}".format(reward))
+        elif has_stopped:
+            too_far_reward = -((gt_dist - 3.0) / 250.0 * 400 + 20) * (gt_dist > 3.0) 
+            too_close_reward = - 20.0 * (gt_dist < 1.0)
+            reward = too_far_reward + too_close_reward
+            print(f"Stop: {reward}, Distance: {gt_dist}")
+
+        # If collection is enabled, save the image data to disk
         if self.collect:
             # Setup the directory for storing images
             write_path = os.path.join(self.collect_path, f'episode_{self.episode}')
@@ -177,10 +195,11 @@ class World:
                 img.save(os.path.join(write_path, f'episode_{self.episode}_{i.frame}.png'))        
             np.save(os.path.join(write_path, 'target'), self.distance_data)
 
+        # Cleanup actors
         self.destroy_actors()
         print(f'Episode {self.episode} ended!')
         self.episode += 1
-        return "DONE"
+        return gt_dist, velocity, reward, "DONE"
 
     def _setup_vehicles(self):
         # This method creates 2 vehicle actors
@@ -222,7 +241,7 @@ class World:
         self.image_queue.put(data)
 
     def handle_collision(self, event):
-        self.collision = True
+        self.collision_queue.put(event)
 
     def get_groundtruth_distance(self):
         distance = self.leading_car.get_location().y - self.lagging_car.get_location().y \

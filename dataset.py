@@ -34,7 +34,7 @@ class PerceptionDataset(Dataset):
         self.target = np.concatenate(self.target, axis=0)
 
         # Perform the train-test split
-        X_train, X_val, Y_train, Y_val = train_test_split(self.images, self.target, test_size=0.2, random_state=seed)
+        X_train, X_val, Y_train, Y_val = train_test_split(self.images, self.target, test_size=0.1, random_state=seed)
         if self.mode == 'train':
             self.images = X_train
             self.target = Y_train
