@@ -1,10 +1,10 @@
 import click
 import torchvision.transforms as T
 
-from trainer import Trainer
-from dataset import PerceptionDataset
-from perception.model import PerceptionNet
-from util import get_loss
+from datasets.perception import PerceptionDataset
+from models.perception.model import PerceptionNet
+from utils.trainer import Trainer
+from utils.util import get_loss
 
 
 @click.argument('save-path')

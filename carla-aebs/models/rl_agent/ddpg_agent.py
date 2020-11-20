@@ -1,14 +1,15 @@
+import json
+import numpy as np
+import os
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 
 from keras import backend as K
-import numpy as np
-from rl_agent.ActorNetwork import ActorNetwork
-from rl_agent.CriticNetwork import CriticNetwork
-from rl_agent.OU import OU
-from rl_agent.ReplayBuffer import ReplayBuffer
-import json
-import os
+from models.rl_agent.ActorNetwork import ActorNetwork
+from models.rl_agent.CriticNetwork import CriticNetwork
+from models.rl_agent.OU import OU
+from models.rl_agent.ReplayBuffer import ReplayBuffer
+
 
 state_dim = 2
 action_dim = 1
@@ -18,6 +19,7 @@ TAU = 0.001
 LRA = 0.0001
 LRC = 0.001
 BUFFER_SIZE = 100000
+
 
 class ddpgAgent():
     def __init__(self, testing=False, load_path=None):
@@ -60,7 +62,8 @@ class ddpgAgent():
             action[0][0] = 0.0
         if action[0][0] > 1.0:
             action[0][0] = 1.0
-        # print("NN Controller: {:5.4f}, Noise NN Controller: {:5.4f}".format(action_original[0][0], action[0][0]))
+        # if self.testing:
+            # print("NN Controller: {:5.4f}, Noise NN Controller: {:5.4f}".format(action_original[0][0], action[0][0]))
         return action
     
     def storeTrajectory(self, s, a, r, s_, done):
@@ -78,7 +81,7 @@ class ddpgAgent():
         target_q_values = self.critic.target_model.predict([new_states, self.actor.target_model.predict(new_states)])
 
         for k in range(len(batch)):
-            if dones[k]:
+            if dones[k] == 'DONE':
                 y_t[k] = rewards[k]
             else:
                 y_t[k] = rewards[k] + GAMMA*target_q_values[k]

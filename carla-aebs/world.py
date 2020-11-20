@@ -6,9 +6,12 @@ import pygame
 import queue
 import random
 import time
+import torchvision.transforms as T
 
 from PIL import Image
-from pid import PID
+
+from utils.pid import PID
+from models.perception.model import PerceptionNet
 
 
 def image_to_array(image):
@@ -21,14 +24,16 @@ def image_to_array(image):
 
 class World:
     # This class setups the world corresponding to AEBS testing with two vehicle actors
-    def __init__(self, 
+    def __init__(self,
         host='localhost',
         port=2000,
         map_type='Town01',
         gui=True, collect=True,
         collect_path=None,
         resX=800,
-        resY=600
+        resY=600,
+        testing=False,
+        perception_chkpt=None
     ):
         self.collect = collect
         self.collect_path = collect_path
@@ -40,6 +45,7 @@ class World:
         self.resX = resX
         self.resY = resY
         self.gui = gui
+        self.testing = testing
         self.episode = 1
         self.sensor_list = []
 
@@ -67,6 +73,14 @@ class World:
         # Actor variables
         self.leading_car = None
         self.lagging_car = None
+
+        # Perception LEC
+        if self.testing:
+            self.model = PerceptionNet()
+            self.model.eval()
+            if perception_chkpt is None:
+                raise ValueError('A valid `perception_chkpt` must be set when testing')
+            self.model.load_state_dict(torch.load(perception_chkpt))
 
         # Set the pygame display
         self.display = None
@@ -164,7 +178,7 @@ class World:
 
         # Check if the episode needs to end
         velocity = self.lagging_car.get_velocity().y
-        gt_dist = self.get_groundtruth_distance()
+        gt_dist = self.get_distance(img) if self.testing else self.get_groundtruth_distance()
         has_stopped = velocity <= 0
         has_collided = not self.collision_queue.empty()
         stop_episode = has_stopped or has_collided
@@ -244,9 +258,22 @@ class World:
         self.collision_queue.put(event)
 
     def get_groundtruth_distance(self):
+        # Compute the distance between the lagging and the leading cars
+        # While computing this distance we need to consider bounding boxes as well
         distance = self.leading_car.get_location().y - self.lagging_car.get_location().y \
                 - self.lagging_car.bounding_box.extent.x - self.leading_car.bounding_box.extent.x
         return distance
+
+    def get_distance(self, frame):
+        # Compute the distance from the perception LEC
+        pil_image = Image.fromarray(image_to_array(frame))
+        to_tensor = T.ToTensor()
+        frame = to_tensor(pil_image)
+        frame = frame.reshape(2, 0, 1).unsqueeze(0)
+        with torch.no_grad():
+            dist = self.model(frame).squeeze().numpy()
+        print(dist)
+        return dist
 
     def destroy_actors(self):
         # This method destroys all the actors

@@ -1,13 +1,13 @@
-import torch
-import torchvision.transforms as T
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
+import torchvision.transforms as T
 
 from PIL import Image
+from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
 
 
 class PerceptionDataset(Dataset):

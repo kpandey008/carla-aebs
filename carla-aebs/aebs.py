@@ -4,20 +4,37 @@ import numpy as np
 import os
 
 from tqdm import tqdm
+
+from models.rl_agent.ddpg_agent import ddpgAgent
+from models.rl_agent.input_preprocessor import InputPreprocessor
 from world import World
-from rl_agent.ddpg_agent import ddpgAgent
-from rl_agent.input_preprocessor import InputPreprocessor
 
 
 @click.command()
-@click.option('--mode', type=click.Choice(['out', 'in'], case_sensitive=False), default='in')
-@click.option('--gui', is_flag=True, default=False)
-@click.option('--testing', is_flag=True, default=False)
-@click.option('--save-path')
-@click.option('--load-path')
-@click.option('--num-episodes',type=int, default=1)
+@click.option('--mode', type=click.Choice(['out', 'in'], case_sensitive=False), default='in', help='Run simulation with GUI')
+@click.option('--gui', is_flag=True, default=False, help='Run simulation in testing mode')
+@click.option('--testing', is_flag=True, default=False, help='Number of episodes to run tests for.')
+@click.option('--save-path', help='Path to save checkpoints to. Only used during training mode')
+@click.option('--load-path', help='Mode to run the simulation in (Out of distribution / Normal)')
+@click.option('--num-episodes',type=int, default=1, help='Path to load checkpoint for the RL agent')
 def aebs(gui=False, testing=False, num_episodes=1, save_path=os.getcwd(), mode='in', load_path=None):
-    world = World(gui=gui, collect=False)
+    """Command to run simulation in train/test mode. For collecting data please refer
+    to the collect command.
+
+    Sample Usage: python aebs.py --save-path /home/lexent/carla_simulation/rl_agent/ \
+                                --num-episodes 2 \
+                                --load-path /home/lexent/carla_simulation/rl_agent/ \
+                                --gui --testing
+
+    Args:
+        gui (bool, optional): [Run simulation with GUI]. Defaults to False.\n
+        testing (bool, optional): [Run simulation in testing mode]. Defaults to False.\n
+        num_episodes (int, optional): [Number of episodes to run tests for.]. Defaults to 1.\n
+        save_path ([type], optional): [Path to save checkpoints to. Only used during training mode]. Defaults to os.getcwd().\n
+        mode (str, optional): [Mode to run the simulation in (Out of distribution / Normal)]. Defaults to 'in'.\n
+        load_path ([type], optional): [Path to load checkpoint for the RL agent]. Defaults to None.\n
+    """
+    world = World(gui=gui, collect=False, testing=testing)
     agent = ddpgAgent(testing=testing, load_path=load_path)
     input_preprocessor = InputPreprocessor()
     if mode == 'in':
@@ -69,7 +86,7 @@ def aebs(gui=False, testing=False, num_episodes=1, save_path=os.getcwd(), mode='
                 if testing is False:
                     if np.mod(episode, 10) == 0:
                         agent.save_model(save_path)
-                print(f"Episode {episode} is done, the reward is {reward}")
+                print(f"Episode {episode + 1} is done, the reward is {reward}")
                 break
 
 

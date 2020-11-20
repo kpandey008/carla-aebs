@@ -5,11 +5,11 @@ import torch
 import torchvision
 import torchvision.transforms as T
 
-from icad.vae import VAE
-from criterion import VAELoss
-from trainer import VAETrainer
-from dataset import PerceptionDataset
-from util import get_loss
+from datasets.perception import PerceptionDataset
+from models.icad.vae import VAE
+from utils.criterion import VAELoss
+from utils.trainer import VAETrainer
+from utils.util import get_loss
 
 import matplotlib.pyplot as plt
 
