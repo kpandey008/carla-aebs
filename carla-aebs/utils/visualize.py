@@ -11,7 +11,7 @@ def plot_metrics(
         'fontsize': fontsize
     }
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=figsize)
-    fig.tight_layout(pad=3.0)
+    fig.tight_layout(pad=3.5)
 
     # Plot distances
     axes[0, 0].plot(comp_dist)
@@ -20,6 +20,9 @@ def plot_metrics(
     axes[0, 0].set_ylabel('Distance(m)')
     axes[0, 0].set_title('Distance Comparison (Computed vs GT)', fontdict=fontdict)
 
+    # Plot the absolute error between the distances and Ground truth
+    axes[0, 1].set_yticks(np.linspace(0, 50, num=5))
+    axes[0, 1].set_autoscaley_on(False)
     axes[0, 1].plot(np.abs(comp_dist - gt_dist))
     axes[0, 1].set_xlabel('Simulation steps')
     axes[0, 1].set_ylabel('Distance(m)')
