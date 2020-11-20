@@ -4,13 +4,13 @@ import numpy as np
 import os
 import pygame
 import queue
-import random
-import time
+import torch
 import torchvision.transforms as T
 
 from PIL import Image
 
 from utils.pid import PID
+from models.icad.vae import VAE
 from models.perception.model import PerceptionNet
 
 
@@ -24,7 +24,8 @@ def image_to_array(image):
 
 class World:
     # This class setups the world corresponding to AEBS testing with two vehicle actors
-    def __init__(self,
+    def __init__(
+        self,
         host='localhost',
         port=2000,
         map_type='Town01',
@@ -33,7 +34,8 @@ class World:
         resX=800,
         resY=600,
         testing=False,
-        perception_chkpt=None
+        perception_chkpt=None,
+        vae_chkpt=None
     ):
         self.collect = collect
         self.collect_path = collect_path
@@ -49,8 +51,10 @@ class World:
         self.episode = 1
         self.sensor_list = []
 
-        # This variable is True if the vehicle collides in the map
-        self.collision = False
+        # Book-keeping variables
+        self.computed_distances = []
+        self.gt_distances = []
+        self.p_values = []
 
         # Create the client
         try:
@@ -58,12 +62,12 @@ class World:
             # if not already running, thus bypassing the need for this check
             self.client = carla.Client(host, port)
             self.client.set_timeout(4.0)
-        except:
+        except Exception:
             raise Exception('Make sure the Carla server is running!')
 
         maps = self.client.get_available_maps()
         map_ = f'/Game/Carla/Maps/{self.map_type}'
-        if not map_ in maps:
+        if map_ not in maps:
             raise Exception(f'The requested map {self.map_type} is not available!')
 
         # Get the world instance
@@ -74,13 +78,26 @@ class World:
         self.leading_car = None
         self.lagging_car = None
 
-        # Perception LEC
         if self.testing:
-            self.model = PerceptionNet()
-            self.model.eval()
+            # Perception LEC
             if perception_chkpt is None:
                 raise ValueError('A valid `perception_chkpt` must be set when testing')
-            self.model.load_state_dict(torch.load(perception_chkpt))
+            self.perception_lec = PerceptionNet()
+            self.perception_lec.load_state_dict(torch.load(perception_chkpt)['model'])
+            self.perception_lec.eval()
+            self.transform = T.Compose([
+                T.Resize((224, 224)),
+                T.ToTensor()
+            ])
+
+            if vae_chkpt is None:
+                raise ValueError('A valid `vae_chkpt` must be set when testing')
+            self.vae = VAE()
+            self.vae.load_state_dict(torch.load(vae_chkpt)['model'])
+            self.vae.eval()
+
+            # Load the calibration scores
+            self.calibration_scores = np.load('/home/lexent/carla_simulation/calibration.npy')
 
         # Set the pygame display
         self.display = None
@@ -102,9 +119,9 @@ class World:
         # Create a new queue for each initialization
         self.image_queue = queue.Queue()
         self.collision_queue = queue.Queue()
-
-        # Reset collision flag which may have been enabled from the last episode
-        self.collision = False
+        self.computed_distances = []
+        self.gt_distances = []
+        self.p_values = []
 
         # Setup world lighting conditions (like precipitation etc.)
         # TODO: Make these params as kwargs
@@ -176,14 +193,24 @@ class World:
             self.image_data.append(img)
             self.distance_data.append(self.get_groundtruth_distance())
 
-        # Check if the episode needs to end
+        pil_image = Image.fromarray(image_to_array(img))
+        frame = self.transform(pil_image).unsqueeze(0)
         velocity = self.lagging_car.get_velocity().y
-        gt_dist = self.get_distance(img) if self.testing else self.get_groundtruth_distance()
+        gt_dist = self.get_groundtruth_distance()
+        dist = self.get_distance(frame) if self.testing else gt_dist
+        self.computed_distances.append(dist)
+        self.gt_distances.append(gt_dist)
+
+        if self.testing:
+            p_value = self.get_pvalue(frame)
+            self.p_values.append(p_value)
+
+        # Check if the episode needs to end
         has_stopped = velocity <= 0
         has_collided = not self.collision_queue.empty()
         stop_episode = has_stopped or has_collided
         if not stop_episode:
-            return gt_dist, velocity, 0, "RESUME"
+            return dist, velocity, 0, "RESUME"
 
         # In case of a collision or vehicle stoppage, compute the reward
         if has_collided:
@@ -191,10 +218,10 @@ class World:
             reward = -200.0 - math.sqrt(collision.x**2 + collision.y**2 + collision.z**2) / 100.0
             print("Collision: {}".format(reward))
         elif has_stopped:
-            too_far_reward = -((gt_dist - 3.0) / 250.0 * 400 + 20) * (gt_dist > 3.0) 
-            too_close_reward = - 20.0 * (gt_dist < 1.0)
+            too_far_reward = -((dist - 3.0) / 250.0 * 400 + 20) * (dist > 3.0) 
+            too_close_reward = - 20.0 * (dist < 1.0)
             reward = too_far_reward + too_close_reward
-            print(f"Stop: {reward}, Distance: {gt_dist}")
+            print(f"Stop: {reward}, Distance: {dist}")
 
         # If collection is enabled, save the image data to disk
         if self.collect:
@@ -213,7 +240,7 @@ class World:
         self.destroy_actors()
         print(f'Episode {self.episode} ended!')
         self.episode += 1
-        return gt_dist, velocity, reward, "DONE"
+        return dist, velocity, reward, "DONE"
 
     def _setup_vehicles(self):
         # This method creates 2 vehicle actors
@@ -266,14 +293,16 @@ class World:
 
     def get_distance(self, frame):
         # Compute the distance from the perception LEC
-        pil_image = Image.fromarray(image_to_array(frame))
-        to_tensor = T.ToTensor()
-        frame = to_tensor(pil_image)
-        frame = frame.reshape(2, 0, 1).unsqueeze(0)
         with torch.no_grad():
-            dist = self.model(frame).squeeze().numpy()
-        print(dist)
+            # Scale the obtained distances
+            dist = self.perception_lec(frame).squeeze().item() * 120
         return dist
+
+    def get_pvalue(self, input):
+        with torch.no_grad():
+            non_conformity_score = self.vae.get_non_conformity_score(input).item()
+            p_value = np.sum(non_conformity_score <= self.calibration_scores) / self.calibration_scores.shape[-1]
+        return p_value
 
     def destroy_actors(self):
         # This method destroys all the actors

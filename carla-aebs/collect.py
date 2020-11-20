@@ -26,11 +26,11 @@ def collect(collect_path=os.getcwd(), gui=False, num_episodes=1, mode='in'):
     # Create the world
     world = World(gui=gui, collect=collect, collect_path=collect_path)
     if mode == 'in':
-        ppt_lower_limit=0
-        ppt_upper_limit=20
+        ppt_lower_limit = 0
+        ppt_upper_limit = 20
     elif mode == 'out':
-        ppt_lower_limit=60
-        ppt_upper_limit=100
+        ppt_lower_limit = 60
+        ppt_upper_limit = 100
 
     for episode in range(num_episodes):
         print(f'Running episode:{episode + 1}')

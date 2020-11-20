@@ -20,8 +20,8 @@ def train_perception(base_dir, save_path, batch_size=32, random_state=0, lr=0.01
     Sample command: python train_perception.py /kaggle/input/simulation/perception_data/ /kaggle/working/ \
                     --batch-size 64\
                     --random-state 0\
-                    --lr 0.0001\
-                    --optim Adam\
+                    --lr 0.01\
+                    --optim SGD\
                     --epochs 100
     Args:
         base_dir ([str]): Directory which stores the training images

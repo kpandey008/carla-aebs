@@ -1,7 +1,14 @@
 import numpy as np
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torchvision.transforms as T
+
+from tqdm import tqdm
+
+from datasets.perception import PerceptionDataset
+from models.icad.vae import VAE
 
 
 _SUPPORTED_DEVICES = ['cpu', 'gpu']
@@ -25,7 +32,6 @@ def get_loss(name):
         return nn.L1Loss()
     else:
         raise NotImplementedError(f'The loss {name} has not been implemented yet!')
-    return loss
 
 
 def get_optimizer(name, net, lr, **kwargs):
@@ -59,11 +65,21 @@ def get_lr_scheduler(optimizer, num_epochs, sched_type='poly', **kwargs):
         raise ValueError(f'The lr_scheduler type {sched_type} has not been implemented yet')
 
 
-def predict_distance(image_batch, chkpt_path):
-    state_dict = torch.load(chkpt_path)
-    net = PerceptionNet()
-    net.eval()
-    net.load_state_dict(state_dict['model'])
-    with torch.no_grad():
-        dist = net(image_batch)
-    return dist
+def compute_calibration_scores(data_dir, vae_chkpt_path, save_path=os.getcwd()):
+    transform = T.Compose([
+        T.Resize((224, 224)),
+        T.ToTensor()
+    ])
+    dataset = PerceptionDataset(data_dir, mode='val', transform=transform, seed=0)
+    non_conformity_scores = []
+    state_dict = torch.load(vae_chkpt_path)
+    vae = VAE()
+    vae.load_state_dict(state_dict['model'])
+    for data, _ in tqdm(dataset):
+        data = data.unsqueeze(0)
+        non_conformity_score = vae.get_non_conformity_score(data)
+        non_conformity_scores.append(non_conformity_score)
+
+    save_path = os.path.join(save_path, 'calibration')
+    np.save(save_path, non_conformity_scores)
+    print(f'Generated calibration scores at: {save_path}')

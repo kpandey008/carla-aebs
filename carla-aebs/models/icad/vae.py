@@ -74,6 +74,12 @@ class VAE(nn.Module):
         decoder_out = self.decode(z)
         return z, decoder_out, mu, logvar
 
+    def get_non_conformity_score(self, x):
+        self.eval()
+        with torch.no_grad():
+            _, reconstruction, _, _ = self.forward(x)
+        return torch.nn.functional.mse_loss(x, reconstruction, reduction='mean')
+
 
 if __name__ == '__main__':
     vae = VAE()
