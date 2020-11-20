@@ -5,7 +5,7 @@ import torch
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from util import configure_device, get_loss, get_lr_scheduler, get_optimizer
+from utils.util import configure_device, get_loss, get_lr_scheduler, get_optimizer
 
 
 class Trainer:
