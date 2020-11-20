@@ -1,13 +1,13 @@
-import torch
-import torchvision.transforms as T
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
+import torchvision.transforms as T
 
 from PIL import Image
+from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
 
 
 class PerceptionDataset(Dataset):
@@ -34,7 +34,7 @@ class PerceptionDataset(Dataset):
         self.target = np.concatenate(self.target, axis=0)
 
         # Perform the train-test split
-        X_train, X_val, Y_train, Y_val = train_test_split(self.images, self.target, test_size=0.2, random_state=seed)
+        X_train, X_val, Y_train, Y_val = train_test_split(self.images, self.target, test_size=0.1, random_state=seed)
         if self.mode == 'train':
             self.images = X_train
             self.target = Y_train
@@ -44,7 +44,6 @@ class PerceptionDataset(Dataset):
         self.target = torch.tensor(self.target).float()
 
     def __getitem__(self, idx):
-        print(self.images[idx])
         image = Image.open(self.images[idx])
         target = self.target[idx]
         if self.transform is not None:

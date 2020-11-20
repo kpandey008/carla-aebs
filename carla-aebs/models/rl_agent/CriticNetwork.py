@@ -1,13 +1,14 @@
 import numpy as np
 import math
-from keras.initializers import normal, identity
 from keras.models import model_from_json, load_model
 from keras.models import Sequential
 from keras.layers import Dense, Flatten, Input, add, Lambda, Activation
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
 import keras.backend as K
-import tensorflow as tf
+
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 
 HIDDEN1_UNITS = 50
 HIDDEN2_UNITS = 30
@@ -20,7 +21,7 @@ class CriticNetwork(object):
         self.LEARNING_RATE = LEARNING_RATE
         self.action_size = action_size
         
-        K.set_session(sess)
+        tf.compat.v1.keras.backend.set_session(sess)
 
         #Now create the model
         self.model, self.action, self.state = self.create_critic_network(state_size, action_size)  
@@ -51,7 +52,7 @@ class CriticNetwork(object):
         h2 = add([h1,a1])    
         h3 = Dense(HIDDEN2_UNITS, activation='relu')(h2)
         V = Dense(action_dim,activation='linear')(h3)   
-        model = Model(input=[S,A],output=V)
+        model = Model(inputs=[S,A], outputs=V)
         adam = Adam(lr=self.LEARNING_RATE)
         model.compile(loss='mse', optimizer=adam)
         return model, A, S 

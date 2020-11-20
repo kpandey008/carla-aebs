@@ -1,16 +1,19 @@
 import numpy as np
 import math
-from keras.initializers import normal, identity
 from keras.models import model_from_json
 from keras.models import Sequential, Model
 from keras.layers import Dense, Flatten, Input, concatenate, Lambda, ReLU, Activation
 from keras.utils.generic_utils import get_custom_objects
 from keras.optimizers import Adam
-import tensorflow as tf
+
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 import keras.backend as K
 
 HIDDEN1_UNITS = 50
 HIDDEN2_UNITS = 30
+
 
 class ActorNetwork(object):
     def __init__(self, sess, state_size, action_size, BATCH_SIZE, TAU, LEARNING_RATE):
@@ -19,7 +22,7 @@ class ActorNetwork(object):
         self.TAU = TAU
         self.LEARNING_RATE = LEARNING_RATE
 
-        K.set_session(sess)
+        tf.compat.v1.keras.backend.set_session(sess)
 
         #Now create the model
         self.model , self.weights, self.state = self.create_actor_network(state_size, action_size)   
@@ -49,6 +52,6 @@ class ActorNetwork(object):
         h0 = Dense(HIDDEN1_UNITS, activation='relu')(S)
         h1 = Dense(HIDDEN2_UNITS, activation='relu')(h0)  
         Brake = Dense(1,activation='sigmoid', kernel_initializer='RandomNormal')(h1)       
-        model = Model(input=S,output=Brake)
+        model = Model(inputs=S, outputs=Brake)
         return model, model.trainable_weights, S
     
