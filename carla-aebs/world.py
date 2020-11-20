@@ -35,7 +35,8 @@ class World:
         resY=600,
         testing=False,
         perception_chkpt=None,
-        vae_chkpt=None
+        vae_chkpt=None,
+        calibration_scores=None
     ):
         self.collect = collect
         self.collect_path = collect_path
@@ -97,7 +98,7 @@ class World:
             self.vae.eval()
 
             # Load the calibration scores
-            self.calibration_scores = np.load('/home/lexent/carla_simulation/calibration.npy')
+            self.calibration_scores = np.load(calibration_scores)
 
         # Set the pygame display
         self.display = None

@@ -1,6 +1,5 @@
 # Python module to learn a VAE for the Perception net training
 import click
-import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as T
@@ -40,7 +39,8 @@ def train_vae(base_dir, save_path, batch_size=32, code_size=1024, random_state=0
     eval_loss = get_loss('mse')
     model = VAE(code_size=code_size)
 
-    trainer = VAETrainer(train_dataset, val_dataset, model, train_loss,
+    trainer = VAETrainer(
+        train_dataset, val_dataset, model, train_loss,
         eval_loss=eval_loss, random_state=random_state,
         batch_size=batch_size, lr=lr, optimizer=optim,
         num_epochs=epochs

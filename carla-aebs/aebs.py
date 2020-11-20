@@ -20,13 +20,15 @@ from world import World
 @click.option('--save-path', help='Path to save checkpoints to. Only used during training mode')
 @click.option('--agent-chkpt-path', help='Path to load checkpoint for the RL agent')
 @click.option('--perception-chkpt-path', help='Path to load checkpoint for the Perception LEC')
-@click.option('--vae-chkpt-path', help='Path to load checkpoint for the Perception LEC')
+@click.option('--calibration-scores', help='Path to pre-computed calibration scores for the in-distribution data')
+@click.option('--vae-chkpt-path', help='Path to load checkpoint for the VAE')
 @click.option('--num-episodes', type=int, default=1, help='Number of episodes to run tests for.')
 @click.option('--generate-plots', is_flag=True, default=False, help='Generate plots after completing the simulation')
 def aebs(
     gui=False, testing=False, num_episodes=1,
     save_path=os.getcwd(), mode='in', agent_chkpt_path=None,
-    perception_chkpt_path=None, vae_chkpt_path=None, generate_plots=False
+    perception_chkpt_path=None, vae_chkpt_path=None, generate_plots=False,
+    calibration_scores=None
 ):
     """Command to run simulation in train/test mode.
     For collecting data please refer to the collect command.
@@ -36,6 +38,7 @@ def aebs(
                                 --agent-chkpt-path /home/lexent/carla_simulation/rl_agent/ \
                                 --perception-chkpt-path /home/lexent/carla_simulation/perception_chkpt/chkpt_8.pt \
                                 --vae-chkpt-path /home/lexent/carla_simulation/vae_chkpt/chkpt_92.pt \
+                                --calibration-scores /home/lexent/carla_simulation/calibration.npy\
                                 --gui --testing --generate-plots
 
     Args:
@@ -49,7 +52,8 @@ def aebs(
     agent = ddpgAgent(testing=testing, load_path=agent_chkpt_path)
     world = World(
         gui=gui, collect=False, testing=testing,
-        perception_chkpt=perception_chkpt_path, vae_chkpt=vae_chkpt_path
+        perception_chkpt=perception_chkpt_path, vae_chkpt=vae_chkpt_path,
+        calibration_scores=calibration_scores
     )
     input_preprocessor = InputPreprocessor()
     if mode == 'in':

@@ -6,6 +6,18 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
+torch = "*"
+numpy = "*"
+matplotlib = "*"
+scikit-learn = "*"
+tqdm = "*"
+torchvision = "*"
+keras = "*"
+tensorflow = "*"
+click = "*"
+pygame = "*"
+pillow = "*"
+carla = "*"
 
 [requires]
 python_version = "3.8"
