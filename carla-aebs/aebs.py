@@ -36,10 +36,10 @@ def aebs(
     Sample Usage: python aebs.py --save-path /home/lexent/carla_simulation/rl_agent/ \
                                 --num-episodes 1 \
                                 --agent-chkpt-path /home/lexent/carla_simulation/rl_agent/ \
-                                --perception-chkpt-path /home/lexent/carla_simulation/perception_chkpt/chkpt_8.pt \
+                                --perception-chkpt-path /home/lexent/carla_simulation/perception_chkpt/chkpt_87.pt \
                                 --vae-chkpt-path /home/lexent/carla_simulation/vae_chkpt/chkpt_92.pt \
                                 --calibration-scores /home/lexent/carla_simulation/calibration.npy\
-                                --gui --testing --generate-plots
+                                --gui --testing --generate-plots --mode in
 
     Args:
         gui (bool, optional): [Run simulation with GUI]. Defaults to False.\n
@@ -60,7 +60,7 @@ def aebs(
         ppt_lower_limit = 0
         ppt_upper_limit = 20
     elif mode == 'out':
-        ppt_lower_limit = 60
+        ppt_lower_limit = 80
         ppt_upper_limit = 100
 
     best_reward = -1000  # Any large negative value will do

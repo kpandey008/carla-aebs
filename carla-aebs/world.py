@@ -194,17 +194,17 @@ class World:
             self.image_data.append(img)
             self.distance_data.append(self.get_groundtruth_distance())
 
-        pil_image = Image.fromarray(image_to_array(img))
-        frame = self.transform(pil_image).unsqueeze(0)
         velocity = self.lagging_car.get_velocity().y
         gt_dist = self.get_groundtruth_distance()
-        dist = self.get_distance(frame) if self.testing else gt_dist
-        self.computed_distances.append(dist)
-        self.gt_distances.append(gt_dist)
-
+        dist = gt_dist
         if self.testing:
+            pil_image = Image.fromarray(image_to_array(img))
+            frame = self.transform(pil_image).unsqueeze(0)
+            dist = self.get_distance(frame)
             p_value = self.get_pvalue(frame)
             self.p_values.append(p_value)
+        self.computed_distances.append(dist)
+        self.gt_distances.append(gt_dist)
 
         # Check if the episode needs to end
         has_stopped = velocity <= 0
