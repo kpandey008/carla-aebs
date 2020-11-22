@@ -115,7 +115,7 @@ def aebs(
         gt_distances = np.array(world.gt_distances)
         p_values = np.array(world.p_values)
         actions = np.array(actions)
-        plot_metrics(comp_distances, gt_distances, actions, p_values)
+        plot_metrics(comp_distances, gt_distances, actions, p_values, mode=mode)
 
 
 if __name__ == '__main__':

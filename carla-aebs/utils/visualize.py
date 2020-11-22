@@ -5,20 +5,23 @@ import os
 
 def plot_metrics(
     comp_dist, gt_dist, braking_action, p_values, fontsize=10,
-    figsize=(8, 8), save=False, save_path=None, caption='fig'
+    figsize=(8, 8), save=False, save_path=None, caption='fig', mode='in'
 ):
+    title = 'In-distribution episode' if mode == 'in' else 'Out-of-distribution episode'
     fontdict = {
         'fontsize': fontsize
     }
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=figsize)
+    fig.suptitle(title, fontsize=12)
     fig.tight_layout(pad=3.5)
 
     # Plot distances
-    axes[0, 0].plot(comp_dist)
-    axes[0, 0].plot(gt_dist)
+    axes[0, 0].plot(comp_dist, label='Predicted Distance')
+    axes[0, 0].plot(gt_dist, label='GroundTruth Distance')
     axes[0, 0].set_xlabel('Simulation steps')
     axes[0, 0].set_ylabel('Distance(m)')
     axes[0, 0].set_title('Distance Comparison (Computed vs GT)', fontdict=fontdict)
+    axes[0, 0].legend(loc='upper right')
 
     # Plot the absolute error between the distances and Ground truth
     axes[0, 1].set_yticks(np.linspace(0, 50, num=5))
