@@ -60,7 +60,7 @@ def aebs(
         ppt_lower_limit = 0
         ppt_upper_limit = 20
     elif mode == 'out':
-        ppt_lower_limit = 80
+        ppt_lower_limit = 60
         ppt_upper_limit = 100
 
     best_reward = -1000  # Any large negative value will do

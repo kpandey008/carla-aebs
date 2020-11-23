@@ -222,7 +222,7 @@ class World:
             too_far_reward = -((dist - 3.0) / 250.0 * 400 + 20) * (dist > 3.0) 
             too_close_reward = - 20.0 * (dist < 1.0)
             reward = too_far_reward + too_close_reward
-            print(f"Stop: {reward}, Distance: {dist}")
+            print(f"Stop: {reward}, Distance: {dist} GroundTruth Distance: {gt_dist}")
 
         # If collection is enabled, save the image data to disk
         if self.collect:
