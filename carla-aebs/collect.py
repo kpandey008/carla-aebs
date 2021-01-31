@@ -46,7 +46,7 @@ def collect(collect_path=os.getcwd(), gui=False, num_episodes=1, mode='in'):
             print(f'Reset failed. Stopping episode {episode + 1} and continuing!')
             continue
         while True:
-            episode_status = world.step()
+            _, _, _, episode_status = world.step()
             if episode_status == "DONE":
                 break
 
